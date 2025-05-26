@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.2
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.2
+    hostname: kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "29092:29092" # External access
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    volumes:
+      - ./kafka_data:/var/lib/kafka/data
+
+  producer:
+    build: ./producer
+    container_name: kafka_producer
+    depends_on:
+      - kafka
+    # Volume mount for local dataset is removed as it's downloaded during build
+    # volumes:
+    #   - ./dataset:/app/dataset 
+    environment:
+      KAFKA_BROKER: 'kafka:9092'
+      # Updated DATASET_PATH to where kaggle CLI downloads and unzips the file
+      DATASET_PATH: '/app/kaggle_dataset/SeoulBikeData.csv' 
+      KAFKA_TOPIC: 'bike_trips'
+      MAX_ROWS_TO_SEND: 30005 
+
+  consumer:
+    build: ./consumer
+    container_name: kafka_consumer
+    depends_on:
+      - kafka
+    volumes:
+      - ./data_batches:/app/data_batches 
+    environment:
+      KAFKA_BROKER: 'kafka:9092'
+      KAFKA_TOPIC: 'bike_trips'
+      GROUP_ID: 'bike_trip_consumer_group'
+      BATCH_SIZE: 10000
+      OUTPUT_DIR: '/app/data_batches'
+      NUM_BATCHES_TO_WRITE: 3
+
+  spark-app:
+    build: ./spark_trainer
+    container_name: spark_trainer_app
+    depends_on:
+      - consumer 
+    volumes:
+      - ./data_batches:/app/data_batches
+      - ./spark_models:/app/spark_models
+    environment:
+      SPARK_MASTER_URL: "local[*]" 
+      APP_NAME: "BikeTripModelTrainer"
+      DATA_BATCHES_DIR: "/app/data_batches"
+      MODELS_DIR: "/app/spark_models"
+    command: >
+      sh -c "
+        echo 'Waiting for batches to be created...'
+        while [ ! -f /app/data_batches/batch_2.csv ]; do sleep 5; done;
+        echo 'Batches found. Starting Spark training...'
+        python spark_trainer.py
+      "
+
+  api:
+    build: ./api
+    container_name: flask_api
+    ports:
+      - "5000:5000"
+    depends_on:
+      - spark-app 
+    volumes:
+      - ./spark_models:/app/spark_models
+    environment:
+      SPARK_MASTER_URL: "local[*]" 
+      APP_NAME: "BikeTripPredictionAPI"
+      MODELS_DIR: "/app/spark_models"
+    command: >
+      sh -c "
+        echo 'Waiting for models and feature importances to be trained/generated...'
+        while [ ! -f /app/spark_models/model_3_rf_feature_importances.json ]; do sleep 10; done;
+        echo 'Models and artifacts found. Starting API...'
+        python api.py
+      "
+
+volumes:
+  kafka_data:
