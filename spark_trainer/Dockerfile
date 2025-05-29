@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Install Java (OpenJDK) - PySpark requires Java
 RUN apt-get update && \
-    apt-get install -y openjdk-11-jre-headless && \
+    apt-get install -y openjdk-11-jre && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
