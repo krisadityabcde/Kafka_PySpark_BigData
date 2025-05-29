@@ -6,6 +6,11 @@
 |Rafael Ega Krisaditya|5027231025|
 |Fico Simhanandi|5027231030|
 
+## Prerequisites
+
+- Personal kaggle.json file, put in `/producer`.
+- Docker
+
 ## Request JSON
 
 ### 1. Predict Duration Endpoint (`/predict/duration/<model_version_num>`)
