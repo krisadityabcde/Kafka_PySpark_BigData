@@ -1,4 +1,1 @@
 kafka-python
-pyspark
-numpy
-pandas
