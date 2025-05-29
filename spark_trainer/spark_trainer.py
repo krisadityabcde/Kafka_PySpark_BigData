@@ -2,7 +2,7 @@ import os
 import json
 from pyspark.sql import SparkSession
 from pyspark.ml.feature import VectorAssembler, Imputer
-from pyspark.ml.regression import RandomForestRegressor
+from pyspark.ml.regression import RandomForestRegressor, DecisionTreeRegressor, GBTRegressor
 from pyspark.ml import Pipeline
 from pyspark.sql.functions import col
 from pyspark.sql.types import FloatType
