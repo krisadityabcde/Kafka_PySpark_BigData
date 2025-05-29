@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.3.2
@@ -39,15 +37,12 @@ services:
     container_name: kafka_producer
     depends_on:
       - kafka
-    # Volume mount for local dataset is removed as it's downloaded during build
-    # volumes:
-    #   - ./dataset:/app/dataset 
     environment:
       KAFKA_BROKER: 'kafka:9092'
-      # Updated DATASET_PATH to where kaggle CLI downloads and unzips the file
-      DATASET_PATH: '/app/kaggle_dataset/SeoulBikeData.csv' 
+      # PERBARUI PATH DATASET DI SINI
+      DATASET_PATH: '/app/kaggle_dataset/For_modeling.csv'
       KAFKA_TOPIC: 'bike_trips'
-      MAX_ROWS_TO_SEND: 30005 
+      MAX_ROWS_TO_SEND: 30005
 
   consumer:
     build: ./consumer
